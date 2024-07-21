@@ -1,0 +1,1 @@
+# zedx2mini
