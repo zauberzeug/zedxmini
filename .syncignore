@@ -1,0 +1,6 @@
+.git/
+__pycache__/
+.DS_Store
+*.tmp
+.env
+.mypy_cache/
