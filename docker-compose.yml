@@ -1,0 +1,18 @@
+version: "3.9"
+services:
+  zedxmini:
+    network_mode: host
+    restart: always
+    privileged: true
+    runtime: nvidia
+    build:
+      context: .
+    volumes:
+      - ./:/app
+      - /dev:/dev
+      - /tmp:/tmp
+      - /var/nvidia/nvcam/settings/:/var/nvidia/nvcam/settings
+      - /etc/systemd/system/zed_x_daemon.service:/etc/systemd/system/zed_x_daemon.service
+      - /usr/local/zed/resources:/usr/local/zed/resources
+    environment:
+      - TZ=Europe/Amsterdam
