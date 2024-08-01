@@ -29,10 +29,10 @@ class StereoCard(ui.card):
     def _new_frame(self) -> None:
         if self.zedxmini is None:
             return
-        if self.zedxmini.last_frame is None:
+        if not self.zedxmini.has_frames:
             return
         frame = self.zedxmini.last_frame
         self.label.text = f'Image resolution: {frame.left.size.width} x {frame.left.size.height} || Image timestamp: {frame.timestamp}'
-        self.left_image_view.set_source(f'/zed/left?{rosys.time()}')
-        self.right_image_view.set_source(f'/zed/right?{rosys.time()}')
-        self.depth_image_view.set_source(f'/zed/depth?{rosys.time()}')
+        self.left_image_view.set_source(f'/zed/left?{frame.timestamp}')
+        self.right_image_view.set_source(f'/zed/right?{frame.timestamp}')
+        self.depth_image_view.set_source(f'/zed/depth?{frame.timestamp}')
