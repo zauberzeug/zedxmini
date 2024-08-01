@@ -63,4 +63,4 @@ async def grab_frame(image_name: str) -> Response:
 camera = Zedxmini()
 stereo_card = StereoCard(camera)
 
-ui.run(title='Zedxmini', reload=True)
+ui.run(title='Zedxmini', reload=True, port=80)
