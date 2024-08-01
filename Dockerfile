@@ -6,10 +6,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     sudo vim less ack-grep rsync wget curl cmake build-essential 
 
 RUN python3 -m pip install --upgrade pip
-WORKDIR /app
 
 RUN --mount=type=cache,target=/home/zauberzeug/.cache/pip \ 
         python3 -m pip install rosys==0.12.0
 
-ENTRYPOINT ["tail"]
-CMD ["-f","/dev/null"]
+# ENTRYPOINT ["tail"]
+# CMD ["-f","/dev/null"]
+WORKDIR /app
+CMD python3 main.py
