@@ -52,7 +52,7 @@ class ZedxminiBase(ABC):
         pass
 
     @abstractmethod
-    def get_depth(self, x, y, size=0, shrink: int = 1.0, lense_distance_in_mm=0) -> float:
+    def get_depth(self, x, y, size=0, shrink: int = 1, lense_distance_in_mm: float = 0.0) -> float:
         pass
 
     @abstractmethod
@@ -134,7 +134,7 @@ class Zedxmini(ZedxminiBase):
                            depth=depth_image, depth_map=depth_map.get_data())
         self.captured_frames.append(last_frame)
 
-    def get_depth(self, x: int, y: int, size: int = 0, shrink: int = 1.0, lense_distance_in_mm=7) -> float:
+    def get_depth(self, x: int, y: int, size: int = 0, shrink: int = 1, lense_distance_in_mm: float = 7.0) -> float:
         assert self.has_frames
         assert self.last_frame is not None
         assert self.last_frame.depth_map is not None
@@ -232,7 +232,7 @@ class ZedxminiSimulation(ZedxminiBase):
                            depth=depth_image, depth_map=depth_map)
         self.captured_frames.append(last_frame)
 
-    def get_depth(self, x, y, size=0, lense_distance_in_mm=0) -> float:
+    def get_depth(self, x: int, y: int, size: int = 0, shrink: int = 1, lense_distance_in_mm: float = 0.0) -> float:
         return 0.1234
 
     def get_camera_information(self) -> dict:
