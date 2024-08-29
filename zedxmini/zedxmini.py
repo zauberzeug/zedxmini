@@ -52,7 +52,7 @@ class ZedxminiBase(ABC):
         pass
 
     @abstractmethod
-    def get_depth(self, x, y, size=0, shrink: int = 1, lense_distance_in_mm: float = 0.0) -> float:
+    def get_depth(self, x: int, y: int, size: int = 0, shrink: int = 1, lense_distance_in_mm: float = 0.0) -> float:
         pass
 
     @abstractmethod
