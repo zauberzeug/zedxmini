@@ -1,4 +1,5 @@
 import logging
+from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass
 
@@ -6,8 +7,13 @@ import cv2
 import numpy as np
 import rosys
 from nicegui import run
-from pyzed import sl
 from rosys.vision import Image, ImageSize
+
+try:
+    from pyzed import sl
+except ModuleNotFoundError:
+    logging.warning("ModuleNotFoundError: No module named 'pyzed'")
+    sl = None
 
 
 @dataclass
@@ -18,23 +24,54 @@ class Frame:
     depth: Image
     depth_map: np.ndarray
 
-# rosys.vision.Camera
 
+class ZedxminiBase(ABC):
+    name: str
 
-class Zedxmini:
-    def __init__(self) -> None:
-        # super().__init__()
-        self.name = 'Zedxmini'
+    def __init__(self, name: str) -> None:
+        self.name = name
         self.log = logging.getLogger(self.name)
+        self.captured_frames: deque[Frame] = deque(maxlen=30)
+
+    @abstractmethod
+    def setup_camera(self):
+        pass
+
+    @property
+    def has_frames(self) -> bool:
+        return len(self.captured_frames) > 0
+
+    @property
+    def last_frame(self) -> Frame | None:
+        if not self.has_frames:
+            return None
+        return self.captured_frames[-1]
+
+    @abstractmethod
+    async def get_image(self) -> None:
+        pass
+
+    @abstractmethod
+    def get_depth(self, x, y, size=0, shrink: int = 1.0, lense_distance_in_mm=0) -> float:
+        pass
+
+    @abstractmethod
+    def get_camera_information(self) -> dict:
+        pass
+
+
+class Zedxmini(ZedxminiBase):
+    def __init__(self) -> None:
+        super().__init__('Zedxmini')
+
         self.log.setLevel(logging.DEBUG)
         self.cam: sl.Camera = None
-        self.captured_frames: deque[Frame] = deque(maxlen=30 * 60)
 
         rosys.on_startup(self.setup_camera)
         rosys.on_shutdown(self.__del__)
-        rosys.on_repeat(self.get_image, 1.0/30.0)
+        rosys.on_repeat(self.get_image, 0.1)
 
-    async def setup_camera(self):
+    def setup_camera(self):
         self.cam = sl.Camera()
         init = sl.InitParameters()
         init.camera_resolution = sl.RESOLUTION.HD1200
@@ -42,16 +79,6 @@ class Zedxmini:
         init.depth_mode = sl.DEPTH_MODE.ULTRA
         status = self.cam.open(init)
         self.log.info("Camera Open: %s", status)
-
-    @property
-    def has_frames(self) -> bool:
-        return len(self.captured_frames) > 0
-
-    @property
-    def last_frame(self) -> Frame:
-        if not self.has_frames:
-            return None
-        return self.captured_frames[-1]
 
     @staticmethod
     def convert(rgba_image: np.ndarray, color=cv2.COLOR_BGRA2BGR) -> bytes:
@@ -107,11 +134,14 @@ class Zedxmini:
                            depth=depth_image, depth_map=depth_map.get_data())
         self.captured_frames.append(last_frame)
 
-    def get_depth(self, x, y, size=0, lense_distance_in_mm=7):
-        # self.log.info(f'x: {x}, y: {y} with shape: {self.last_frame.depth_map.shape}')
+    def get_depth(self, x: int, y: int, size: int = 0, shrink: int = 1.0, lense_distance_in_mm=7) -> float:
+        assert self.has_frames
+        assert self.last_frame is not None
+        assert self.last_frame.depth_map is not None
+        self.log.debug(f'x: {x}, y: {y}, size: {size} with shape: {self.last_frame.depth_map.shape}')
         last_frame = self.captured_frames[-1]
         if size == 0:
-            depth_value = last_frame.depth_map[y, x]
+            depth_value = last_frame.depth_map[int(y), int(x)]
         else:
             min_y = int(max(0, y-size))
             max_y = int(min(last_frame.depth_map.shape[0], y+size))
@@ -122,5 +152,140 @@ class Zedxmini:
         depth_value -= lense_distance_in_mm
         return depth_value
 
+    def get_camera_information(self) -> dict:
+        camera_information = self.cam.get_camera_information()
+        camera_dict = {
+            'camera_model': str(camera_information.camera_model),
+            'serial_number': camera_information.serial_number,
+            'camera_firmware': camera_information.camera_configuration.firmware_version,
+            'sensors_firmware': camera_information.sensors_configuration.firmware_version,
+            'resolution': (camera_information.camera_configuration.resolution.width, camera_information.camera_configuration.resolution.height),
+            'fps': camera_information.camera_configuration.fps,
+            'calibration': {
+                'baseline': camera_information.camera_configuration.calibration_parameters.get_camera_baseline(),
+                'left_cam': {
+                    'fx': camera_information.camera_configuration.calibration_parameters.left_cam.fx,
+                    'fy': camera_information.camera_configuration.calibration_parameters.left_cam.fy,
+                    'cx': camera_information.camera_configuration.calibration_parameters.left_cam.cx,
+                    'cy': camera_information.camera_configuration.calibration_parameters.left_cam.cy,
+                    'k1': camera_information.camera_configuration.calibration_parameters.left_cam.disto[0],
+                    'k2': camera_information.camera_configuration.calibration_parameters.left_cam.disto[1],
+                    'p1': camera_information.camera_configuration.calibration_parameters.left_cam.disto[2],
+                    'p2': camera_information.camera_configuration.calibration_parameters.left_cam.disto[3],
+                    'k3': camera_information.camera_configuration.calibration_parameters.left_cam.disto[4],
+                    'k4': camera_information.camera_configuration.calibration_parameters.left_cam.disto[5],
+                    'k5': camera_information.camera_configuration.calibration_parameters.left_cam.disto[6],
+                    'k6': camera_information.camera_configuration.calibration_parameters.left_cam.disto[7],
+                    's1': camera_information.camera_configuration.calibration_parameters.left_cam.disto[8],
+                    's2': camera_information.camera_configuration.calibration_parameters.left_cam.disto[9],
+                    's3': camera_information.camera_configuration.calibration_parameters.left_cam.disto[10],
+                    's4': camera_information.camera_configuration.calibration_parameters.left_cam.disto[11],
+                    'fov_vertical': camera_information.camera_configuration.calibration_parameters.left_cam.v_fov,
+                    'fov_horizontal': camera_information.camera_configuration.calibration_parameters.left_cam.h_fov,
+                    'fov_diagonal': camera_information.camera_configuration.calibration_parameters.left_cam.d_fov,
+                },
+                'right_cam': {
+                    'fx': camera_information.camera_configuration.calibration_parameters.right_cam.fx,
+                    'fy': camera_information.camera_configuration.calibration_parameters.right_cam.fy,
+                    'cx': camera_information.camera_configuration.calibration_parameters.right_cam.cx,
+                    'cy': camera_information.camera_configuration.calibration_parameters.right_cam.cy,
+                    'k1': camera_information.camera_configuration.calibration_parameters.right_cam.disto[0],
+                    'k2': camera_information.camera_configuration.calibration_parameters.right_cam.disto[1],
+                    'p1': camera_information.camera_configuration.calibration_parameters.right_cam.disto[2],
+                    'p2': camera_information.camera_configuration.calibration_parameters.right_cam.disto[3],
+                    'k3': camera_information.camera_configuration.calibration_parameters.right_cam.disto[4],
+                    'k4': camera_information.camera_configuration.calibration_parameters.right_cam.disto[5],
+                    'k5': camera_information.camera_configuration.calibration_parameters.right_cam.disto[6],
+                    'k6': camera_information.camera_configuration.calibration_parameters.right_cam.disto[7],
+                    's1': camera_information.camera_configuration.calibration_parameters.right_cam.disto[8],
+                    's2': camera_information.camera_configuration.calibration_parameters.right_cam.disto[9],
+                    's3': camera_information.camera_configuration.calibration_parameters.right_cam.disto[10],
+                    's4': camera_information.camera_configuration.calibration_parameters.right_cam.disto[11],
+                    'fov_vertical': camera_information.camera_configuration.calibration_parameters.right_cam.v_fov,
+                    'fov_horizontal': camera_information.camera_configuration.calibration_parameters.right_cam.h_fov,
+                    'fov_diagonal': camera_information.camera_configuration.calibration_parameters.right_cam.d_fov,
+                },
+            }
+        }
+        return camera_dict
+
     def __del__(self):
         self.cam.close()
+
+
+class ZedxminiSimulation(ZedxminiBase):
+    def __init__(self) -> None:
+        super().__init__('ZedxminiSimulation')
+        rosys.on_repeat(self.get_image, 1.0)
+
+    def setup_camera(self):
+        pass
+
+    async def get_image(self) -> None:
+        timestamp = rosys.time()
+        left_image = Image.create_placeholder(f'{self.name}_left - {timestamp}', timestamp, self.name + "_left")
+        right_image = Image.create_placeholder(f'{self.name}_right - {timestamp}', timestamp, self.name + "_right")
+        depth_image = Image.create_placeholder(f'{self.name}_depth - {timestamp}', timestamp, self.name + "_depth")
+        depth_map = np.zeros(left_image.size.tuple)
+
+        last_frame = Frame(timestamp=timestamp, left=left_image, right=right_image,
+                           depth=depth_image, depth_map=depth_map)
+        self.captured_frames.append(last_frame)
+
+    def get_depth(self, x, y, size=0, lense_distance_in_mm=0) -> float:
+        return 0.1234
+
+    def get_camera_information(self) -> dict:
+        return {
+            'camera_model': 'Zed Mini',
+            'serial_number': '1234567890',
+            'camera_firmware': '1.0.0',
+            'sensors_firmware': '1.0.0',
+            'resolution': (1280, 720),
+            'fps': 30,
+            'calibration': {
+                'baseline': 120,
+                'left_cam': {
+                    'fx': 700,
+                    'fy': 700,
+                    'cx': 640,
+                    'cy': 360,
+                    'k1': 0.0,
+                    'k2': 0.0,
+                    'p1': 0.0,
+                    'p2': 0.0,
+                    'k3': 0.0,
+                    'k4': 0.0,
+                    'k5': 0.0,
+                    'k6': 0.0,
+                    's1': 0.0,
+                    's2': 0.0,
+                    's3': 0.0,
+                    's4': 0.0,
+                    'fov_vertical': 45.0,
+                    'fov_horizontal': 90.0,
+                    'fov_diagonal': 100.0,
+                },
+                'right_cam': {
+                    'fx': 700,
+                    'fy': 700,
+                    'cx': 640,
+                    'cy': 360,
+                    'k1': 0.0,
+                    'k2': 0.0,
+                    'p1': 0.0,
+                    'p2': 0.0,
+                    'k3': 0.0,
+                    'k4': 0.0,
+                    'k5': 0.0,
+                    'k6': 0.0,
+                    's1': 0.0,
+                    's2': 0.0,
+                    's3': 0.0,
+                    's4': 0.0,
+                    'fov_vertical': 45.0,
+                    'fov_horizontal': 90.0,
+                    'fov_diagonal': 100.0,
+                },
+            }
+        }

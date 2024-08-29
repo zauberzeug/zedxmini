@@ -11,8 +11,8 @@ from livesync import Folder, sync
 # touch = 'touch /main.py'
 # , on_change=touch
 sync(
-    Folder('.', f'zauberzeug@192.168.178.27:~/zedxmini'),
-    # Folder('.', f'zauberzeug@192.168.1.251:~/zedxmini'),
+    # Folder('.', 'zauberzeug@192.168.178.27:~/zedxmini'),
+    Folder('.', 'zauberzeug@192.168.1.252:~/zedxmini'),
 
 
     # Uncomment the following lines to sync additional folders and thereby make them available on the robot:
