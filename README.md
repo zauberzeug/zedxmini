@@ -1,4 +1,4 @@
-# zedx2mini
+# ZED X Mini Stereo Camera
 
 ## Setup
 
