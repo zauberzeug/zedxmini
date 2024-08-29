@@ -1,21 +1,26 @@
 # zedx2mini
 
-https://store.stereolabs.com/en-de/products/zed-x-mini-stereo-camera
+## Setup
 
-https://www.stereolabs.com/docs/tutorials/image-capture
+- Flash Jetson Orin Nano with Jetpack 5.1.2
+- Install [ZED SDK](https://www.stereolabs.com/en-de/developers/release#nvidia-jetson-504616ef8d38)
+  - [Get started with Zed X](https://www.stereolabs.com/docs/get-started-with-zed-x#setting-up-your-system-for-zed-x)
+- Setup [ZED Link Duo Capture Card](https://www.stereolabs.com/docs/get-started-with-zed-link/dual-jetson-orin-nano-devkit-setup)
+- Install [ZED Link Drivers](https://www.stereolabs.com/en-de/developers/drivers#jetpack-5-105-58f0ac216f52)
+  - [Get started with ZED Link Drivers](https://www.stereolabs.com/docs/get-started-with-zed-link/install-the-drivers)
 
-https://github.com/stereolabs/zed-sdk
+# Additional info
 
-https://www.stereolabs.com/docs/get-started-with-zed-link/install-the-drivers
+[Zed X Mini Product Page](https://www.stereolabs.com/en-de/store/products/zed-x-mini-stereo-camera)
 
-https://www.stereolabs.com/docs/api/python/index.html
+[Stereolabs Docs: API Reference, Tutorials, and Integration](https://www.stereolabs.com/docs)
 
-https://support.stereolabs.com/hc/en-us/articles/360011828773-How-do-I-recalibrate-my-ZED-stereo-camera
+[Python API](https://www.stereolabs.com/docs/api/python/index.html)
 
-https://www.stereolabs.com/docs/get-started-with-zed-link/dual-jetson-orin-nano-devkit-setup
+[How do I recalibrate my ZED stereo camera? ](https://support.stereolabs.com/hc/en-us/articles/360011828773-How-do-I-recalibrate-my-ZED-stereo-camera)
 
-https://www.stereolabs.com/docs/installation/docker
+[Running ZED SDK in a Docker Container](https://www.stereolabs.com/docs/installation/docker)
 
-https://www.stereolabs.com/docs/docker/creating-your-image
+[Creating a Docker Image for your ZED Application](https://www.stereolabs.com/docs/docker/creating-your-image)
 
-https://github.com/stereolabs/zed-docker/blob/master/4.X/l4t/py-devel/Dockerfile#L16C1-L16C17
+[Tutorials](https://www.stereolabs.com/docs/tutorials)
