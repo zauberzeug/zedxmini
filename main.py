@@ -99,4 +99,4 @@ else:
     camera = Zedxmini()
 stereo_card = StereoCard(camera, shrink_factor=3, update_interval=0.1)
 
-ui.run(title='Zedxmini', reload=True, port=80)
+ui.run(title='Zedxmini', reload=True, port=8003)
