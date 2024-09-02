@@ -3,11 +3,13 @@
 ## Setup
 
 - Flash Jetson Orin Nano with Jetpack 5.1.2
-- Install [ZED SDK](https://www.stereolabs.com/en-de/developers/release#nvidia-jetson-504616ef8d38)
-  - [Get started with Zed X](https://www.stereolabs.com/docs/get-started-with-zed-x#setting-up-your-system-for-zed-x)
+- Install dependencies
+  - `sudo apt install zstd libqt5core5a`
 - Setup [ZED Link Duo Capture Card](https://www.stereolabs.com/docs/get-started-with-zed-link/dual-jetson-orin-nano-devkit-setup)
 - Install [ZED Link Drivers](https://www.stereolabs.com/en-de/developers/drivers#jetpack-5-105-58f0ac216f52)
   - [Get started with ZED Link Drivers](https://www.stereolabs.com/docs/get-started-with-zed-link/install-the-drivers)
+- Install [ZED SDK](https://www.stereolabs.com/en-de/developers/release#nvidia-jetson-504616ef8d38)
+  - [Get started with Zed X](https://www.stereolabs.com/docs/get-started-with-zed-x#setting-up-your-system-for-zed-x)
 
 # Additional info
 
