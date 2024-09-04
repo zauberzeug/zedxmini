@@ -59,6 +59,14 @@ class ZedxminiBase(ABC):
     def get_camera_information(self) -> dict:
         pass
 
+    @abstractmethod
+    def get_camera_setting(self, setting_type) -> int:
+        pass
+
+    @abstractmethod
+    def set_camera_setting(self, setting_type, value) -> int:
+        pass
+
 
 class Zedxmini(ZedxminiBase):
     def __init__(self) -> None:
@@ -208,6 +216,18 @@ class Zedxmini(ZedxminiBase):
             }
         }
         return camera_dict
+
+    def get_camera_setting(self, setting_type) -> tuple[bool, int]:
+        if self.cam is None:
+            return (False, -1)
+        return_value = self.cam.get_camera_settings(setting_type)
+        return (return_value == sl.ERROR_CODE.SUCCESS, return_value[1])
+
+    def set_camera_setting(self, setting_type, value) -> bool:
+        if self.cam is None:
+            return False
+        self.cam.set_camera_settings(setting_type, value)
+        return False
 
     def __del__(self):
         self.cam.close()

@@ -1,7 +1,13 @@
-from __future__ import annotations
+import logging
 
 import rosys
 from nicegui import events, ui
+
+try:
+    from pyzed import sl
+except ModuleNotFoundError:
+    logging.warning("ModuleNotFoundError: No module named 'pyzed'")
+    sl = None
 
 from .zedxmini import Zedxmini, ZedxminiSimulation
 
@@ -22,6 +28,13 @@ class StereoCard(ui.card):
                 depth_image_view_switch = ui.switch('Depth Image', value=True)
                 ui.switch('Show Crosshair').bind_value(self, 'show_crosshair')
                 ui.number(label='Shrink', value=shrink_factor, format='%1d').bind_value_to(self, 'shrink_factor')
+
+            if sl is not None:
+                with ui.expansion('Camera Control').classes('w-full text-align:right'):
+                    with ui.row():
+                        ui.label('SATURATION')
+                        ui.slider(min=0, max=8, value=self.zedxmini.get_camera_setting(sl.VIDEO_SETTINGS.SATURATION)[0], on_change=lambda e: self.zedxmini.set_camera_setting(
+                            sl.VIDEO_SETTINGS.SATURATION, int(e.value)))
 
             with ui.expansion('Information').classes('w-full text-align:right'):
                 ui.label('TODO: zedxmini.get_camera_information()')
