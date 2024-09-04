@@ -74,8 +74,8 @@ class Zedxmini(ZedxminiBase):
     def setup_camera(self):
         self.cam = sl.Camera()
         init = sl.InitParameters()
-        init.camera_resolution = sl.RESOLUTION.HD1200
-        init.camera_fps = 30
+        init.camera_resolution = sl.RESOLUTION.HD1080
+        init.camera_fps = 15
         init.depth_mode = sl.DEPTH_MODE.ULTRA
         status = self.cam.open(init)
         self.log.info("Camera Open: %s", status)

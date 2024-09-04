@@ -70,7 +70,7 @@ async def grab_image() -> JSONResponse:
     image = camera.last_frame.left
     assert image is not None
     assert image.data is not None
-    encoded_image = base64.b64encode(image.data).decode('utf-8')
+    encoded_image = image.data.hex()
     return JSONResponse({
         'camera_id': image.camera_id,
         'width': image.size.width,
@@ -97,6 +97,6 @@ if simulation:
     camera = ZedxminiSimulation()
 else:
     camera = Zedxmini()
-stereo_card = StereoCard(camera, shrink_factor=3, update_interval=0.1)
+stereo_card = StereoCard(camera)
 
 ui.run(title='Zedxmini', reload=True, port=8003)
