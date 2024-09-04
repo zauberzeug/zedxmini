@@ -7,11 +7,12 @@ from .zedxmini import Zedxmini, ZedxminiSimulation
 
 
 class StereoCard(ui.card):
-    def __init__(self, zedxmini: Zedxmini | ZedxminiSimulation, shrink_factor: int = 1, update_interval: float = 0.1) -> None:
+    def __init__(self, zedxmini: Zedxmini | ZedxminiSimulation, shrink_factor: int = 1, update_interval: float = 0.1, show_crosshair: bool = True) -> None:
         super().__init__()
         self.style('position: relative;')
         self.zedxmini = zedxmini
         self.shrink_factor = shrink_factor
+        self.show_crosshair = show_crosshair
 
         with self:
             self.label = ui.label('test')
@@ -19,6 +20,7 @@ class StereoCard(ui.card):
                 left_image_view_switch = ui.switch('Left Camera', value=True)
                 right_image_view_switch = ui.switch('Right Camera', value=False)
                 depth_image_view_switch = ui.switch('Depth Image', value=True)
+                ui.switch('Show Crosshair').bind_value(self, 'show_crosshair')
                 ui.number(label='Shrink', value=shrink_factor, format='%1d').bind_value_to(self, 'shrink_factor')
 
             with ui.expansion('Information').classes('w-full text-align:right'):
@@ -52,5 +54,7 @@ class StereoCard(ui.card):
         assert frame is not None
         self.label.text = f'Image resolution: {frame.left.size.width} x {frame.left.size.height} || Image timestamp: {frame.timestamp}'
         self.left_image_view.set_source(f'/images/left?{frame.timestamp}&shrink={int(self.shrink_factor)}')
+        self.left_image_view.set_content(
+            f'''<circle cx="{(frame.left.size.width/self.shrink_factor)/2}" cy="{(frame.left.size.height/self.shrink_factor)/2}" r="5" stroke="red" stroke-width="3" fill="None" />''' if self.show_crosshair else '')
         self.right_image_view.set_source(f'/images/right?{frame.timestamp}&shrink={int(self.shrink_factor)}')
         self.depth_image_view.set_source(f'/images/depth?{frame.timestamp}&shrink={int(self.shrink_factor)}')
