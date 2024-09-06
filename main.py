@@ -83,11 +83,6 @@ async def grab_image() -> JSONResponse:
     })
 
 
-@app.get('/depth')
-async def get_depth(x: int = 0, y: int = 0, size: int = 0) -> Response:
-    return Response(str(camera.get_depth(int(x), int(y), size)))
-
-
 @app.get('/point')
 async def get_point(x: int = 0, y: int = 0) -> JSONResponse:
     point3d: rosys.geometry.Point3d | None = camera.get_point(int(x), int(y))

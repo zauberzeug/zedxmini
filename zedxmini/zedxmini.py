@@ -23,7 +23,6 @@ class Frame:
     left: Image
     right: Image
     depth: Image
-    depth_map: np.ndarray
     # TODO
     point_cloud: Any
 
@@ -138,32 +137,12 @@ class Zedxmini(ZedxminiBase):
             data=jpeg_image_bytes,
         )
 
-        depth_map = sl.Mat()
-        self.cam.retrieve_measure(depth_map, sl.MEASURE.DEPTH)
-
         point_cloud = sl.Mat()
         self.cam.retrieve_measure(point_cloud, sl.MEASURE.XYZ)
 
         last_frame = Frame(timestamp=timestamp, left=left_image, right=right_image,
-                           depth=depth_image, depth_map=depth_map.get_data(), point_cloud=point_cloud)
+                           depth=depth_image, point_cloud=point_cloud)
         self.captured_frames.append(last_frame)
-
-    def get_depth(self, x: int, y: int, size: int = 0, shrink: int = 1, lense_distance_in_mm: float = 7.0) -> float:
-        assert self.has_frames
-        assert self.last_frame is not None
-        assert self.last_frame.depth_map is not None
-        last_frame = self.last_frame
-        if size == 0:
-            depth_value = last_frame.depth_map[int(y), int(x)]
-        else:
-            min_y = int(max(0, y-size))
-            max_y = int(min(last_frame.depth_map.shape[0], y+size))
-            min_x = int(max(0, x-size))
-            max_x = int(min(last_frame.depth_map.shape[1], x+size))
-            self.log.info(f'min_y: {min_y}, max_y: {max_y}, min_x: {min_x}, max_x: {max_x}')
-            depth_value = np.nanmean(last_frame.depth_map[min_y:max_y, min_x:max_x])
-        depth_value -= lense_distance_in_mm
-        return depth_value / 1000.0
 
     def get_point(self, x: int, y: int) -> rosys.geometry.Point3d:
         assert self.has_frames
@@ -258,10 +237,9 @@ class ZedxminiSimulation(ZedxminiBase):
         left_image = Image.create_placeholder(f'{self.name}_left - {timestamp}', timestamp, self.name + "_left")
         right_image = Image.create_placeholder(f'{self.name}_right - {timestamp}', timestamp, self.name + "_right")
         depth_image = Image.create_placeholder(f'{self.name}_depth - {timestamp}', timestamp, self.name + "_depth")
-        depth_map = np.zeros(left_image.size.tuple)
 
         last_frame = Frame(timestamp=timestamp, left=left_image, right=right_image,
-                           depth=depth_image, depth_map=depth_map, point_cloud=None)
+                           depth=depth_image, point_cloud=None)
         self.captured_frames.append(last_frame)
 
     def get_depth(self, x: int, y: int, size: int = 0, shrink: int = 1, lense_distance_in_mm: float = 0.0) -> float:
