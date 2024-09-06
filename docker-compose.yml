@@ -16,5 +16,6 @@ services:
       - /var/nvidia/nvcam/settings/:/var/nvidia/nvcam/settings
       - /etc/systemd/system/zed_x_daemon.service:/etc/systemd/system/zed_x_daemon.service
       - /usr/local/zed/resources:/usr/local/zed/resources
+      - /usr/local/zed/settings:/usr/local/zed/settings
     environment:
       - TZ=Europe/Amsterdam
