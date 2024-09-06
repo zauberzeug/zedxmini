@@ -2,6 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass
+from typing import Any
 
 import cv2
 import numpy as np
@@ -23,6 +24,8 @@ class Frame:
     right: Image
     depth: Image
     depth_map: np.ndarray
+    # TODO
+    point_cloud: Any
 
 
 class ZedxminiBase(ABC):
@@ -31,7 +34,7 @@ class ZedxminiBase(ABC):
     def __init__(self, name: str) -> None:
         self.name = name
         self.log = logging.getLogger(self.name)
-        self.captured_frames: deque[Frame] = deque(maxlen=30)
+        self.captured_frames: deque[Frame] = deque(maxlen=10)
 
     @abstractmethod
     def setup_camera(self):
@@ -60,7 +63,7 @@ class ZedxminiBase(ABC):
         pass
 
     @abstractmethod
-    def get_camera_setting(self, setting_type) -> int:
+    def get_camera_setting(self, setting_type) -> tuple[bool, int]:
         pass
 
     @abstractmethod
@@ -84,7 +87,7 @@ class Zedxmini(ZedxminiBase):
         init = sl.InitParameters()
         init.camera_resolution = sl.RESOLUTION.HD1080
         init.camera_fps = 15
-        init.depth_mode = sl.DEPTH_MODE.ULTRA
+        init.depth_mode = sl.DEPTH_MODE.QUALITY
         status = self.cam.open(init)
         self.log.info("Camera Open: %s", status)
 
@@ -138,16 +141,18 @@ class Zedxmini(ZedxminiBase):
         depth_map = sl.Mat()
         self.cam.retrieve_measure(depth_map, sl.MEASURE.DEPTH)
 
+        point_cloud = sl.Mat()
+        self.cam.retrieve_measure(point_cloud, sl.MEASURE.XYZ)
+
         last_frame = Frame(timestamp=timestamp, left=left_image, right=right_image,
-                           depth=depth_image, depth_map=depth_map.get_data())
+                           depth=depth_image, depth_map=depth_map.get_data(), point_cloud=point_cloud)
         self.captured_frames.append(last_frame)
 
     def get_depth(self, x: int, y: int, size: int = 0, shrink: int = 1, lense_distance_in_mm: float = 7.0) -> float:
         assert self.has_frames
         assert self.last_frame is not None
         assert self.last_frame.depth_map is not None
-        self.log.debug(f'x: {x}, y: {y}, size: {size} with shape: {self.last_frame.depth_map.shape}')
-        last_frame = self.captured_frames[-1]
+        last_frame = self.last_frame
         if size == 0:
             depth_value = last_frame.depth_map[int(y), int(x)]
         else:
@@ -158,7 +163,14 @@ class Zedxmini(ZedxminiBase):
             self.log.info(f'min_y: {min_y}, max_y: {max_y}, min_x: {min_x}, max_x: {max_x}')
             depth_value = np.nanmean(last_frame.depth_map[min_y:max_y, min_x:max_x])
         depth_value -= lense_distance_in_mm
-        return depth_value
+        return depth_value / 1000.0
+
+    def get_point(self, x: int, y: int) -> rosys.geometry.Point3d:
+        assert self.has_frames
+        assert self.last_frame is not None
+        assert self.last_frame.point_cloud is not None
+        _, point = self.last_frame.point_cloud.get_value(x, y)
+        return rosys.geometry.Point3d(x=point[0] / 1000.0, y=point[1] / 1000.0, z=point[2] / 1000.0)
 
     def get_camera_information(self) -> dict:
         camera_information = self.cam.get_camera_information()
@@ -249,7 +261,7 @@ class ZedxminiSimulation(ZedxminiBase):
         depth_map = np.zeros(left_image.size.tuple)
 
         last_frame = Frame(timestamp=timestamp, left=left_image, right=right_image,
-                           depth=depth_image, depth_map=depth_map)
+                           depth=depth_image, depth_map=depth_map, point_cloud=None)
         self.captured_frames.append(last_frame)
 
     def get_depth(self, x: int, y: int, size: int = 0, shrink: int = 1, lense_distance_in_mm: float = 0.0) -> float:
