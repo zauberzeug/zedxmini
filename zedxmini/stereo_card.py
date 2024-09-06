@@ -13,7 +13,7 @@ from .zedxmini import Zedxmini, ZedxminiSimulation
 
 
 class StereoCard(ui.card):
-    def __init__(self, zedxmini: Zedxmini | ZedxminiSimulation, shrink_factor: int = 2, update_interval: float = 0.1, show_crosshair: bool = True) -> None:
+    def __init__(self, zedxmini: Zedxmini | ZedxminiSimulation, shrink_factor: int = 2, update_interval: float = 1.0 / 30.0, show_crosshair: bool = True) -> None:
         super().__init__()
         self.style('position: relative;')
         self.zedxmini = zedxmini

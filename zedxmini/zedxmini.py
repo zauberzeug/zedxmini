@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 import rosys
 from nicegui import run
+from rosys.geometry import Point3d
 from rosys.vision import Image, ImageSize
 
 try:
@@ -33,7 +34,7 @@ class ZedxminiBase(ABC):
     def __init__(self, name: str) -> None:
         self.name = name
         self.log = logging.getLogger(self.name)
-        self.captured_frames: deque[Frame] = deque(maxlen=10)
+        self.captured_frames: deque[Frame] = deque(maxlen=120)
 
     @abstractmethod
     def setup_camera(self):
