@@ -80,13 +80,13 @@ class Zedxmini(ZedxminiBase):
 
         rosys.on_startup(self.setup_camera)
         rosys.on_shutdown(self.__del__)
-        rosys.on_repeat(self.get_image, 0.1)
+        rosys.on_repeat(self.get_image, 1.0/30.0)
 
     def setup_camera(self):
         self.cam = sl.Camera()
         init = sl.InitParameters()
         init.camera_resolution = sl.RESOLUTION.HD1080
-        init.camera_fps = 15
+        init.camera_fps = 30
         init.depth_mode = sl.DEPTH_MODE.QUALITY
         status = self.cam.open(init)
         self.log.info("Camera Open: %s", status)
