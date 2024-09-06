@@ -149,7 +149,7 @@ class Zedxmini(ZedxminiBase):
         assert self.has_frames
         assert self.last_frame is not None
         assert self.last_frame.point_cloud is not None
-        _, point = self.last_frame.point_cloud.get_value(x, y)
+        _, point = self.last_frame.point_cloud.get_value(int(x), int(y))
         return Point3d(x=point[0] / 1000.0, y=point[1] / 1000.0, z=point[2] / 1000.0)
 
     def get_camera_information(self) -> dict:
