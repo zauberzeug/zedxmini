@@ -54,7 +54,7 @@ class ZedxminiBase(ABC):
         pass
 
     @abstractmethod
-    def get_depth(self, x: int, y: int, size: int = 0, shrink: int = 1, lense_distance_in_mm: float = 0.0) -> float:
+    def get_point(self, x: int, y: int) -> Point3d:
         pass
 
     @abstractmethod
@@ -144,12 +144,12 @@ class Zedxmini(ZedxminiBase):
                            depth=depth_image, point_cloud=point_cloud)
         self.captured_frames.append(last_frame)
 
-    def get_point(self, x: int, y: int) -> rosys.geometry.Point3d:
+    def get_point(self, x: int, y: int) -> Point3d:
         assert self.has_frames
         assert self.last_frame is not None
         assert self.last_frame.point_cloud is not None
         _, point = self.last_frame.point_cloud.get_value(x, y)
-        return rosys.geometry.Point3d(x=point[0] / 1000.0, y=point[1] / 1000.0, z=point[2] / 1000.0)
+        return Point3d(x=point[0] / 1000.0, y=point[1] / 1000.0, z=point[2] / 1000.0)
 
     def get_camera_information(self) -> dict:
         camera_information = self.cam.get_camera_information()
@@ -242,8 +242,8 @@ class ZedxminiSimulation(ZedxminiBase):
                            depth=depth_image, point_cloud=None)
         self.captured_frames.append(last_frame)
 
-    def get_depth(self, x: int, y: int, size: int = 0, shrink: int = 1, lense_distance_in_mm: float = 0.0) -> float:
-        return 0.1234
+    def get_point(self, x: int, y: int) -> Point3d:
+        return Point3d(x=0.0, y=0.0, z=0.3)
 
     def get_camera_information(self) -> dict:
         return {

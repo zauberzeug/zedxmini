@@ -54,9 +54,8 @@ class StereoCard(ui.card):
         ui.timer(update_interval, self._new_frame)
 
     def left_mouse_handler(self, e: events.MouseEventArguments) -> None:
-        depth = self.zedxmini.get_depth(e.image_x, e.image_y)
-        error = abs(depth*0.001)
-        rosys.notify(f'Depth: {depth:.3f} +- {error:.3f}')
+        point3d = self.zedxmini.get_point(e.image_x, e.image_y)
+        rosys.notify(f'Clicked point: {point3d.tuple}')
 
     def _new_frame(self) -> None:
         if self.zedxmini is None:
