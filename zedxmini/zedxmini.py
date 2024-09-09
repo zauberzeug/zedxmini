@@ -34,7 +34,7 @@ class ZedxminiBase(ABC):
     def __init__(self, name: str) -> None:
         self.name = name
         self.log = logging.getLogger(self.name)
-        self.captured_frames: deque[Frame] = deque(maxlen=120)
+        self.captured_frames: deque[Frame] = deque(maxlen=1)
 
     @abstractmethod
     def setup_camera(self):
@@ -88,6 +88,7 @@ class Zedxmini(ZedxminiBase):
         init.camera_resolution = sl.RESOLUTION.HD1080
         init.camera_fps = 30
         init.depth_mode = sl.DEPTH_MODE.QUALITY
+        # init.depth_mode = sl.DEPTH_MODE.NEURAL_PLUS
         status = self.cam.open(init)
         self.log.info("Camera Open: %s", status)
 
@@ -118,25 +119,27 @@ class Zedxmini(ZedxminiBase):
             data=jpeg_image_bytes,
         )
 
-        image = sl.Mat()
-        self.cam.retrieve_image(image, sl.VIEW.RIGHT)
-        jpeg_image_bytes = await run.cpu_bound(self.convert, image.get_data())
-        right_image = Image(
-            camera_id=self.name,
-            size=ImageSize(width=image.get_width(), height=image.get_height()),
-            time=timestamp,
-            data=jpeg_image_bytes,
-        )
+        # image = sl.Mat()
+        # self.cam.retrieve_image(image, sl.VIEW.RIGHT)
+        # jpeg_image_bytes = await run.cpu_bound(self.convert, image.get_data())
+        # right_image = Image(
+        #     camera_id=self.name,
+        #     size=ImageSize(width=image.get_width(), height=image.get_height()),
+        #     time=timestamp,
+        #     data=jpeg_image_bytes,
+        # )
+        right_image = None
 
-        image = sl.Mat()
-        self.cam.retrieve_image(image, sl.VIEW.DEPTH)
-        jpeg_image_bytes = await run.cpu_bound(self.convert, image.get_data())
-        depth_image = Image(
-            camera_id=self.name,
-            size=ImageSize(width=image.get_width(), height=image.get_height()),
-            time=timestamp,
-            data=jpeg_image_bytes,
-        )
+        # image = sl.Mat()
+        # self.cam.retrieve_image(image, sl.VIEW.DEPTH)
+        # jpeg_image_bytes = await run.cpu_bound(self.convert, image.get_data())
+        # depth_image = Image(
+        #     camera_id=self.name,
+        #     size=ImageSize(width=image.get_width(), height=image.get_height()),
+        #     time=timestamp,
+        #     data=jpeg_image_bytes,
+        # )
+        depth_image = None
 
         point_cloud = sl.Mat()
         self.cam.retrieve_measure(point_cloud, sl.MEASURE.XYZ)
@@ -146,6 +149,7 @@ class Zedxmini(ZedxminiBase):
         self.captured_frames.append(last_frame)
 
     def get_point(self, x: int, y: int) -> Point3d:
+        # TODO: image id
         assert self.has_frames
         assert self.last_frame is not None
         assert self.last_frame.point_cloud is not None
