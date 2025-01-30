@@ -9,7 +9,6 @@ parser.add_argument('robot', help='Robot hostname')
 
 args = parser.parse_args()
 touch = 'touch ~/zedxmini/main.py'
-folders = [Folder('.', f'{args.robot}:~/zedxmini', on_change=touch)]
 sync(
-    Folder('.', f'{args.robot}:~/zedxmini', on_change=touch)
+    Folder('.', f'{args.robot}:~/zedxmini_ros', on_change=touch)
 )

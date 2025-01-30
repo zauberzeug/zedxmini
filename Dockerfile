@@ -72,6 +72,11 @@ RUN /ros2_install.sh "https://github.com/facontidavide/rosx_introspection.git"
 RUN /ros2_install.sh "https://github.com/nlohmann/json.git"
 RUN /ros2_install.sh https://github.com/foxglove/ros-foxglove-bridge.git
 
+RUN /ros2_install.sh "https://github.com/RobotWebTools/rosbridge_suite.git -b humble"
+RUN /ros2_install.sh "https://github.com/ros-perception/image_common.git -b humble"
+RUN apt-get update && apt-get install --yes python3-bson python3-pil && rm -rf /var/lib/apt/lists/*
+RUN python3 -m pip install tornado
+
 # Copy your custom files
 COPY ros_entrypoint.sh /sbin/ros_entrypoint.sh
 COPY launch.py /sbin/launch.py
@@ -79,5 +84,5 @@ COPY launch.py /sbin/launch.py
 # Set correct permissions
 RUN sudo chmod 755 /sbin/ros_entrypoint.sh
 
-ENTRYPOINT ["source \"/opt/ros/$ROS_DISTRO/install/setup.bash\" && ros2 launch /sbin/launch.py"]
+ENTRYPOINT ["/sbin/ros_entrypoint.sh"]
 CMD ["bash"]

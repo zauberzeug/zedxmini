@@ -1,6 +1,6 @@
 version: "3.9"
 services:
-  zedxmini:
+  zedxmini_ros:
     network_mode: host
     restart: always
     privileged: true

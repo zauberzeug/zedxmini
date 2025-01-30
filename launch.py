@@ -31,9 +31,41 @@ def generate_launch_description():
             'use_compression': True
         }]
     )
+    # web_bridge = Node(
+    #     package='rosbridge_server',
+    #     executable='rosbridge_websocket',
+    #     name='rosbridge_websocket',
+    #     parameters=[{
+    #         'port': 9090,
+    #         'address': '0.0.0.0',
+    #         # 'retry_startup_delay': 5.0,
+    #         # 'fragment_timeout': 600,
+    #         # 'delay_between_messages': 0,
+    #         # 'max_message_size': 10_000_000,
+    #         # 'unregister_timeout': 10.0,
+    #         # # 'use_compression': False,
+    #         # 'topics_glob': [],
+    #         # 'services_glob': [],
+    #         # 'params_glob': []
+    #     }],
+    #     output='screen'
+    # )
+
+    # rosapi = Node(
+    #     package='rosapi',
+    #     executable='rosapi_node',
+    #     name='rosapi',
+    #     # parameters=[{
+    #     #     'topics_glob': [],
+    #     #     'services_glob': [],
+    #     #     'params_glob': []
+    #     # }]
+    # )
 
     # Create and return launch description
     return LaunchDescription([
         zed_launch,
         foxglove_bridge
+        # web_bridge,
+        # rosapi
     ])
