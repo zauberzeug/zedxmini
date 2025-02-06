@@ -1,5 +1,8 @@
 # https://github.com/stereolabs/zed-ros2-wrapper/tree/master/docker
 
+# Avalible dustynv ros humble images:
+# 36.3.0 for Jetpack 6, 35.4.1 for Jetpack 5, 32.7.1 for Jetpack 4
+
 ARG L4T_VERSION=l4t-r36.3.0
 ARG IMAGE_NAME=dustynv/ros:humble-ros-base-${L4T_VERSION}
 
@@ -133,7 +136,9 @@ WORKDIR /root/ros2_ws
 
 # Setup environment variables 
 COPY ros_entrypoint_jetson.sh /sbin/ros_entrypoint.sh
-RUN sudo chmod 755 /sbin/ros_entrypoint.sh
+COPY launch.sh /sbin/launch.sh
+RUN sudo chmod 755 /sbin/ros_entrypoint.sh && \
+    sudo chmod 755 /sbin/launch.sh
 
 ENTRYPOINT ["/sbin/ros_entrypoint.sh"]
-CMD ["bash"]
+CMD ["/sbin/launch.sh"]

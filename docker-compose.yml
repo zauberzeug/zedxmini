@@ -1,21 +1,12 @@
 version: "3.9"
 services:
-  zedxmini_ros:
-    network_mode: host
-    restart: always
-    privileged: true
-    runtime: nvidia
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-      # dockerfile: ./Dockerfile.JP6
+  rosys:
+    image: "zauberzeug/rosys:latest"
+    ports:
+      - "8080:8080"
     volumes:
       - ./:/app
-      - /dev:/dev
-      - /tmp:/tmp
-      - /var/nvidia/nvcam/settings/:/var/nvidia/nvcam/settings
-      - /etc/systemd/system/zed_x_daemon.service:/etc/systemd/system/zed_x_daemon.service
-      - /usr/local/zed/resources:/usr/local/zed/resources
-      - /usr/local/zed/settings:/usr/local/zed/settings
-    environment:
-      - TZ=Europe/Amsterdam
+      - ./../..:/rosys # to directly modify rosys code
+      - ./:/rosys/examples/zedxmini # for developing within rosys workspace
+    hostname: docker
+    restart: unless-stopped
