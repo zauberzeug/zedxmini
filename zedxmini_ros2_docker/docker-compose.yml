@@ -8,18 +8,18 @@ services:
       - ROS_DOMAIN_ID=0
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
-      # - ZED_GMSL2_CAMERA=1
-      # - ZED_GMSL_CAMERA=1
-      # - ZED_GMSL_CAMERA_MODE=0
-      # - ZED_GMSL_CAMERA_RESOLUTION=1080
-      # - ZED_GMSL_CAMERA_FPS=30
-      # - ZED_SDK_VERBOSE=1
+      - ZED_GMSL2_CAMERA=1
+      - ZED_GMSL_CAMERA=1
+      - ZED_GMSL_CAMERA_MODE=0
+      - ZED_GMSL_CAMERA_RESOLUTION=1080
+      - ZED_GMSL_CAMERA_FPS=30
+      - ZED_SDK_VERBOSE=1
     volumes:
       - /dev:/dev
       - /tmp:/tmp
       - /var/nvidia/nvcam/settings/:/var/nvidia/nvcam/settings
       - /usr/local/zed/settings:/usr/local/zed/settings
-      # - /usr/local/zed/resources:/usr/local/zed/resources
+      - /usr/local/zed/resources:/usr/local/zed/resources #without this, the AI models do not get optimized -> Elaborate!
       # - /etc/systemd/system/zed_x_daemon.service:/etc/systemd/system/zed_x_daemon.service
       # - /sys/bus/i2c/devices:/sys/bus/i2c/devices
       # - /sys/class/video4linux:/sys/class/video4linux

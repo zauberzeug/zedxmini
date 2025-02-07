@@ -1,4 +1,0 @@
-nicegui
-roslibpy
-opencv-python
-numpy 
