@@ -24,7 +24,7 @@ services:
       # - /sys/bus/i2c/devices:/sys/bus/i2c/devices
       # - /sys/class/video4linux:/sys/class/video4linux
     ports:
-      - "9090:9090" # ROS bridge WebSocket port
+      - "8765:8765" # Foxglove Bridge WebSocket port
     # tty: true # Keep STDIN open
     # stdin_open: true # Keep container running
     restart: unless-stopped

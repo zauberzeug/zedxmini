@@ -52,12 +52,9 @@ RUN apt-get update && \
     ros-${ROS2_DIST}-ros2launch \
     ros-${ROS2_DIST}-launch-xml \
     ros-${ROS2_DIST}-launch-yaml \
-    ros-${ROS2_DIST}-rosbridge-suite \
-    ros-${ROS2_DIST}-rosbridge-server \
-    ros-${ROS2_DIST}-rosbridge-msgs \
-    ros-${ROS2_DIST}-rosbridge-library && \
+    ros-${ROS2_DIST}-foxglove-bridge && \
     rm -rf /var/lib/apt/lists/* && \
-    chmod +x /opt/ros/$ROS2_DIST/lib/rosbridge_server/rosbridge_websocket
+    chmod +x /opt/ros/$ROS2_DIST/lib/foxglove_bridge/foxglove_bridge
 
 # ZED SDK link
 ENV ZED_SDK_URL="https://stereolabs.sfo2.cdn.digitaloceanspaces.com/zedsdk/${ZED_SDK_MAJOR}.${ZED_SDK_MINOR}/ZED_SDK_Tegra_L4T${L4T_MAJOR}.${L4T_MINOR}_v${ZED_SDK_MAJOR}.${ZED_SDK_MINOR}.${ZED_SDK_PATCH}.zstd.run"
