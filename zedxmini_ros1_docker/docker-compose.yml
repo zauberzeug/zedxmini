@@ -1,0 +1,23 @@
+services:
+  zed_ros1:
+    build: .
+    privileged: true # Needed for camera access
+    runtime: nvidia # Needed for ZED SDK
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - ZED_GMSL2_CAMERA=1
+      - ZED_GMSL_CAMERA=1
+      - ZED_GMSL_CAMERA_MODE=0
+      - ZED_GMSL_CAMERA_RESOLUTION=1080
+      - ZED_GMSL_CAMERA_FPS=30
+      - ZED_SDK_VERBOSE=1
+    volumes:
+      - /dev:/dev
+      - /tmp:/tmp
+      - /var/nvidia/nvcam/settings/:/var/nvidia/nvcam/settings
+      - /usr/local/zed/settings:/usr/local/zed/settings
+      - /usr/local/zed/resources:/usr/local/zed/resources
+    ports:
+      - "8765:8765" # Foxglove Bridge WebSocket port
+    restart: unless-stopped
