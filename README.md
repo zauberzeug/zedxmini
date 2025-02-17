@@ -9,6 +9,7 @@
 - Install [ZED Link Drivers](https://www.stereolabs.com/en-de/developers/drivers#jetpack-5-105-58f0ac216f52)
   - [Get started with ZED Link Drivers](https://www.stereolabs.com/docs/get-started-with-zed-link/install-the-drivers)
 - Install [ZED SDK](https://www.stereolabs.com/en-de/developers/release#nvidia-jetson-504616ef8d38)
+  - [ZED SDK Installation](https://www.stereolabs.com/docs/installation/jetson)
   - [Get started with Zed X](https://www.stereolabs.com/docs/get-started-with-zed-x#setting-up-your-system-for-zed-x)
 - Check camera connection
   - `python3 test_camera.py`
