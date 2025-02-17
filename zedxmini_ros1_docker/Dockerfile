@@ -7,7 +7,7 @@
 # Based on https://hub.docker.com/r/stereolabs/zed/
 # needed ubuntu 20.04 for ros noetic
 ARG L4T_MAJOR=35
-ARG L4T_MINOR=2
+ARG L4T_MINOR=4
 ARG ZED_SDK_MAJOR=4
 ARG ZED_SDK_MINOR=2
 #ARG ZED_SDK_PATCH=0
