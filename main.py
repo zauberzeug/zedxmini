@@ -4,8 +4,7 @@ import numpy as np
 from fastapi import Response
 from fastapi.responses import JSONResponse
 from nicegui import Client, app, core, ui
-import norospy
-from norospy.msg import Image, Imu, CompressedPointCloud2
+from norospy import ROSFoxgloveClient
 import base64
 import logging
 import json
@@ -16,58 +15,54 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # Global variables
-ros = None
 current_rgb_image = None
 current_depth_image = None
 current_point_cloud = None
 current_imu_data = None
-point_cloud_topic = None
 point_cloud_subscription_active = False  # Track subscription state globally
 last_point_cloud_time = 0
 point_cloud_count = 0
+ros_client = None
+
+# Add rate limiting variables
+last_rgb_update = 0
+last_depth_update = 0
+last_imu_update = 0
+last_pc_update = 0
 
 def connect_ros():
-    global ros
+    global ros_client
     try:
-        # Initialize ROS1 connection using norospy
-        norospy.init_node('zed_mini_viewer', anonymous=True)
-        logger.info("Connected to ROS1")
+        # Create a new client and start it
+        ros_client = ROSFoxgloveClient('ws://localhost:8765')
+        ros_client.run_background()
+        logger.info("Connected to Foxglove WebSocket server")
         
-        # Try to set point cloud resolution to reduce data size
-        try:
-            norospy.set_param('/zed/zed_node/general/pub_resolution', 2)  # HD720 resolution
-            norospy.set_param('/zed/zed_node/depth/point_cloud_freq', 5.0)  # 5Hz update rate
-            norospy.set_param('/zed/zed_node/point_cloud/cloud_registered/zstd/zstd_encode_level', 1)  # Fastest compression
-        except Exception as e:
-            logger.warning(f"Could not set point cloud parameters: {e}")
-        
-        # Subscribe to RGB image topic
-        norospy.Subscriber('/zed/zed_node/rgb/image_rect_color', Image, rgb_image_callback)
-        
-        # Subscribe to depth image topic
-        norospy.Subscriber('/zed/zed_node/depth/depth_registered', Image, depth_image_callback)
-        
-        # Subscribe to IMU topic
-        norospy.Subscriber('/zed/zed_node/imu/data', Imu, imu_callback)
-        
-        # Subscribe to point cloud topic
-        norospy.Subscriber(
-            '/zed/zed_node/point_cloud/cloud_registered/zstd',
-            CompressedPointCloud2,
-            point_cloud_callback,
-            queue_size=1  # Only keep latest message
+        # Subscribe to topics
+        ros_client.subscribe('/zedxm/zed_node/rgb/image_rect_color', 'sensor_msgs/Image', rgb_image_callback)
+        ros_client.subscribe('/zedxm/zed_node/depth/depth_registered', 'sensor_msgs/Image', depth_image_callback)
+        ros_client.subscribe('/zedxm/zed_node/imu/data', 'sensor_msgs/Imu', imu_callback)
+        ros_client.subscribe(
+            '/zedxm/zed_node/point_cloud/cloud_registered',
+            'sensor_msgs/PointCloud2',
+            point_cloud_callback
         )
         global point_cloud_subscription_active
         point_cloud_subscription_active = True
         
-        logger.info("Connected to ROS topics")
+        logger.info("Connected to ROS topics via Foxglove")
     except Exception as e:
-        logger.error(f"Failed to connect to ROS: {str(e)}")
-        ros = None
+        logger.error(f"Failed to connect to Foxglove: {str(e)}")
 
-def imu_callback(message):
-    global current_imu_data
+def imu_callback(message, ts):
+    global current_imu_data, last_imu_update
     try:
+        # Rate limiting to 10 Hz
+        current_time = time.time()
+        if current_time - last_imu_update < 0.1:  # 100ms = 10Hz
+            return
+        last_imu_update = current_time
+
         # Extract IMU data and timestamps
         receive_time = time.time()
         msg_time = message.header.stamp
@@ -76,7 +71,7 @@ def imu_callback(message):
         current_imu_data = {
             'header': {
                 'seq': message.header.seq,
-                'stamp': {'sec': message.header.stamp.secs, 'nanosec': message.header.stamp.nsecs},
+                'stamp': {'sec': msg_time.secs, 'nanosec': msg_time.nsecs},
                 'frame_id': message.header.frame_id
             },
             'orientation': {
@@ -103,51 +98,78 @@ def imu_callback(message):
         logger.error(f"Error processing IMU data: {str(e)}")
 
 def cleanup_point_cloud():
-    global point_cloud_subscription_active
+    global point_cloud_subscription_active, ros_client
     if point_cloud_subscription_active:
         try:
-            # In norospy, subscribers are automatically cleaned up when the node shuts down
             logger.info("Point cloud subscription will be cleaned up on shutdown")
         except Exception as e:
             logger.error(f"Error cleaning up point cloud subscription: {str(e)}")
     point_cloud_subscription_active = False
+    if ros_client:
+        try:
+            ros_client.close()
+            logger.info("ROS client closed")
+        except Exception as e:
+            logger.error(f"Error closing ROS client: {str(e)}")
 
 @app.on_shutdown
 def shutdown():
     cleanup_point_cloud()
-    try:
-        norospy.signal_shutdown('Application shutting down')
-    except Exception as e:
-        logger.error(f"Error during shutdown: {str(e)}")
 
-def rgb_image_callback(message):
-    global current_rgb_image
+def rgb_image_callback(message, ts):
+    global current_rgb_image, last_rgb_update
     try:
+        # Rate limiting to 5 Hz
+        current_time = time.time()
+        if current_time - last_rgb_update < 0.2:  # 200ms = 5Hz
+            return
+        last_rgb_update = current_time
+
         # Get raw image data
         img_data = np.frombuffer(message.data, dtype=np.uint8)
         
         # Reshape the image data
         height = message.height
         width = message.width
+        encoding = message.encoding
         
         if height and width:
-            # Reshape assuming RGBA format (4 channels)
-            img_data = img_data.reshape((height, width, 4))
-            # Convert RGBA to RGB
-            img_data = cv2.cvtColor(img_data, cv2.COLOR_RGBA2BGR)
+            # Reshape based on encoding
+            if encoding == 'rgb8':
+                img_data = img_data.reshape((height, width, 3))
+                img_data = cv2.cvtColor(img_data, cv2.COLOR_RGB2BGR)
+            elif encoding == 'rgba8':
+                img_data = img_data.reshape((height, width, 4))
+                img_data = cv2.cvtColor(img_data, cv2.COLOR_RGBA2BGR)
+            elif encoding == 'bgr8':
+                img_data = img_data.reshape((height, width, 3))
+            elif encoding == 'bgra8':
+                img_data = img_data.reshape((height, width, 4))
+                img_data = cv2.cvtColor(img_data, cv2.COLOR_BGRA2BGR)
+            else:
+                logger.warning(f"Unexpected image encoding: {encoding}")
+                return
             
-            # Encode as JPEG
-            _, buffer = cv2.imencode('.jpg', img_data)
+            # Resize image to reduce memory usage
+            img_data = cv2.resize(img_data, (640, 480))
+            
+            # Encode as JPEG with compression
+            _, buffer = cv2.imencode('.jpg', img_data, [cv2.IMWRITE_JPEG_QUALITY, 85])
             current_rgb_image = buffer.tobytes()
     except Exception as e:
         logger.error(f"Error processing RGB image: {str(e)}")
 
-def depth_image_callback(message):
-    global current_depth_image
+def depth_image_callback(message, ts):
+    global current_depth_image, last_depth_update
     try:
+        # Rate limiting to 5 Hz
+        current_time = time.time()
+        if current_time - last_depth_update < 0.2:  # 200ms = 5Hz
+            return
+        last_depth_update = current_time
+
         # Get raw depth data
         depth_data = np.frombuffer(message.data, dtype=np.float32)
-        
         height = message.height
         width = message.width
         
@@ -155,32 +177,38 @@ def depth_image_callback(message):
             # Reshape depth data
             depth_data = depth_data.reshape((height, width))
             
+            # Resize to reduce memory usage
+            depth_data = cv2.resize(depth_data, (640, 480))
+            
             # Handle invalid/infinite values
             depth_data = np.nan_to_num(depth_data, nan=0.0, posinf=20.0, neginf=0.0)
             
-            # Normalize depth for visualization (adjust min_depth and max_depth as needed)
+            # Normalize depth for visualization
             min_depth = 0.0
             max_depth = 20.0  # 20 meters, adjust based on your needs
             depth_normalized = np.clip(depth_data, min_depth, max_depth)
-            # Ensure we don't divide by zero
             depth_range = max_depth - min_depth
             if depth_range > 0:
                 depth_normalized = ((depth_normalized - min_depth) / depth_range * 255).astype(np.uint8)
             else:
                 depth_normalized = np.zeros_like(depth_normalized, dtype=np.uint8)
             
-            # Apply colormap for better visualization
+            # Apply colormap and encode with compression
             depth_colormap = cv2.applyColorMap(depth_normalized, cv2.COLORMAP_JET)
-            
-            # Encode as JPEG
-            _, buffer = cv2.imencode('.jpg', depth_colormap)
+            _, buffer = cv2.imencode('.jpg', depth_colormap, [cv2.IMWRITE_JPEG_QUALITY, 85])
             current_depth_image = buffer.tobytes()
     except Exception as e:
         logger.error(f"Error processing depth image: {str(e)}")
 
-def point_cloud_callback(message):
-    global current_point_cloud, last_point_cloud_time, point_cloud_count
+def point_cloud_callback(message, ts):
+    global current_point_cloud, last_point_cloud_time, point_cloud_count, last_pc_update
     try:
+        # Rate limiting to 10 Hz
+        current_time = time.time()
+        if current_time - last_pc_update < 0.1:  # 100ms = 10Hz
+            return
+        last_pc_update = current_time
+
         receive_time = time.time()
         msg_time = message.header.stamp
         msg_time_sec = msg_time.secs + msg_time.nsecs / 1e9
@@ -193,7 +221,7 @@ def point_cloud_callback(message):
         info = {
             'header': {
                 'seq': message.header.seq,
-                'stamp': {'sec': message.header.stamp.secs, 'nanosec': message.header.stamp.nsecs},
+                'stamp': {'sec': msg_time.secs, 'nanosec': msg_time.nsecs},
                 'frame_id': message.header.frame_id
             },
             'height': message.height,
@@ -232,8 +260,7 @@ def point_cloud_callback(message):
 def main_page():
     global point_cloud_subscription_active
     
-    if ros is None:
-        connect_ros()
+    connect_ros()
     
     with ui.column().classes('w-full items-center'):
         status = ui.label('Connecting to ROS...').classes('text-lg mb-2')
@@ -251,7 +278,7 @@ def main_page():
                 depth_image = ui.image().classes('w-[640px] h-[480px] border-2')
         
         def update_images():
-            if ros is None or not ros:
+            if ros_client is None:
                 status.text = 'Not connected to ROS'
                 status.classes('text-red-500')
                 return
@@ -271,7 +298,19 @@ def main_page():
                 except Exception as e:
                     logger.error(f"Error updating depth image in UI: {str(e)}")
         
-        ui.button('Refresh Images', on_click=update_images).classes('mt-4 p-2 bg-blue-500 text-white')
+        # Add auto-refresh timer with toggle functionality
+        timer = ui.timer(0.2, update_images)  # Create timer but don't start it
+        timer.active = False  # Initially inactive
+        
+        def toggle_refresh():
+            timer.active = not timer.active  # Toggle timer state
+            refresh_button.text = 'Stop Refresh' if timer.active else 'Start Refresh'
+            refresh_button.classes('bg-red-500' if timer.active else 'bg-blue-500', remove='bg-red-500 bg-blue-500')
+            if not timer.active:  # If stopping, do one final update
+                update_images()
+        
+        # Toggle refresh button
+        refresh_button = ui.button('Start Refresh', on_click=toggle_refresh).classes('mt-4 p-2 bg-blue-500 text-white')
         
         # Point cloud status display
         with ui.row().classes('items-center gap-2 mt-4'):
@@ -279,60 +318,28 @@ def main_page():
         
         # Add debug information display
         debug_info = ui.label().classes('mt-4 text-sm font-mono whitespace-pre')
-        def update_debug():
-            rgb_size = len(current_rgb_image) if current_rgb_image is not None else 0
-            depth_size = len(current_depth_image) if current_depth_image is not None else 0
-            pc_size = current_point_cloud.get('compressed_size', 0) if current_point_cloud else 0
-            debug_info.text = (
-                f'RGB size: {rgb_size} bytes\n'
-                f'Depth size: {depth_size} bytes\n'
-                f'Point Cloud size: {pc_size} bytes'
-            )
         
+        def update_debug():
+            debug_info.text = f'''RGB size: {len(current_rgb_image) if current_rgb_image else 0} bytes
+Depth size: {len(current_depth_image) if current_depth_image else 0} bytes
+Point Cloud size: {current_point_cloud["compressed_size"] if current_point_cloud else 0} bytes'''
+        
+        # Add debug buttons
         ui.button('Show Image Debug', on_click=update_debug).classes('mt-2 p-2 bg-gray-500 text-white')
         
-        # Update point cloud debug display
-        point_cloud_info = ui.label().classes('mt-4 text-sm font-mono whitespace-pre-wrap break-all')
         def show_point_cloud_debug():
             if current_point_cloud is not None:
-                point_cloud_info.text = (
-                    f'Point Cloud Info:\n'
-                    f'{json.dumps(current_point_cloud, indent=2)}\n\n'
-                    f'Stats:\n'
-                    f'- Message count: {point_cloud_count}\n'
-                    f'- Compressed size: {current_point_cloud["compressed_size"]/1024/1024:.2f}MB\n'
-                    f'- Update rate: {current_point_cloud["average_rate"]}\n'
-                    f'- Last update: {current_point_cloud["time_since_last"]}\n'
-                    f'Timing:\n'
-                    f'- Message timestamp: {time.strftime("%H:%M:%S", time.localtime(current_point_cloud["msg_timestamp"]))}.'
-                    f'{int((current_point_cloud["msg_timestamp"] % 1) * 1000):03d}\n'
-                    f'- Received timestamp: {time.strftime("%H:%M:%S", time.localtime(current_point_cloud["receive_timestamp"]))}.'
-                    f'{int((current_point_cloud["receive_timestamp"] % 1) * 1000):03d}\n'
-                    f'- Latency: {current_point_cloud["latency"]*1000:.1f}ms'
-                )
+                debug_info.text = json.dumps(current_point_cloud, indent=2)
             else:
-                point_cloud_info.text = 'No point cloud data received yet'
+                debug_info.text = 'No point cloud data received yet'
         
         ui.button('Show Point Cloud Debug', on_click=show_point_cloud_debug).classes('mt-2 p-2 bg-gray-500 text-white')
         
-        # Add IMU data display
-        imu_info = ui.label().classes('mt-4 text-sm font-mono whitespace-pre-wrap break-all')
         def show_imu_data():
             if current_imu_data is not None:
-                imu_info.text = (
-                    f'IMU Data:\n'
-                    f'Orientation (x,y,z,w): {json.dumps(current_imu_data["orientation"], indent=2)}\n'
-                    f'Angular Velocity (x,y,z): {json.dumps(current_imu_data["angular_velocity"], indent=2)}\n'
-                    f'Linear Acceleration (x,y,z): {json.dumps(current_imu_data["linear_acceleration"], indent=2)}\n\n'
-                    f'Timing:\n'
-                    f'- Message timestamp: {time.strftime("%H:%M:%S", time.localtime(current_imu_data["msg_timestamp"]))}.'
-                    f'{int((current_imu_data["msg_timestamp"] % 1) * 1000):03d}\n'
-                    f'- Received timestamp: {time.strftime("%H:%M:%S", time.localtime(current_imu_data["receive_timestamp"]))}.'
-                    f'{int((current_imu_data["receive_timestamp"] % 1) * 1000):03d}\n'
-                    f'- Latency: {current_imu_data["latency"]*1000:.1f}ms'
-                )
+                debug_info.text = json.dumps(current_imu_data, indent=2)
             else:
-                imu_info.text = 'No IMU data received yet'
+                debug_info.text = 'No IMU data received yet'
         
         ui.button('Show IMU Data', on_click=show_imu_data).classes('mt-2 p-2 bg-gray-500 text-white')
 
