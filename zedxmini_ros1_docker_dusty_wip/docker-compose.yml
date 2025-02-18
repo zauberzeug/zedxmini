@@ -15,6 +15,7 @@ services:
     volumes:
       - /dev:/dev
       - /tmp:/tmp
+      - ./bag:/bag
       - /var/nvidia/nvcam/settings/:/var/nvidia/nvcam/settings
       - /usr/local/zed/settings:/usr/local/zed/settings
       - /usr/local/zed/resources:/usr/local/zed/resources
