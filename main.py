@@ -4,7 +4,8 @@ import numpy as np
 from fastapi import Response
 from fastapi.responses import JSONResponse
 from nicegui import Client, app, core, ui
-import roslibpy
+import norospy
+from norospy.msg import Image, Imu, CompressedPointCloud2
 import base64
 import logging
 import json
@@ -26,41 +27,36 @@ last_point_cloud_time = 0
 point_cloud_count = 0
 
 def connect_ros():
-    global ros, point_cloud_topic
+    global ros
     try:
-        # Initialize ROS with custom websocket options
-        ros = roslibpy.Ros(host='192.168.178.71', port=9090)
-        ros.run()
-        logger.info("Connected to ROS2 websocket bridge")
+        # Initialize ROS1 connection using norospy
+        norospy.init_node('zed_mini_viewer', anonymous=True)
+        logger.info("Connected to ROS1")
         
         # Try to set point cloud resolution to reduce data size
         try:
-            ros.set_param('/zed/zed_node/general/pub_resolution', 2)  # HD720 resolution
-            ros.set_param('/zed/zed_node/depth/point_cloud_freq', 5.0)  # 5Hz update rate
-            ros.set_param('/zed/zed_node/point_cloud/cloud_registered/zstd/zstd_encode_level', 1)  # Fastest compression
+            norospy.set_param('/zed/zed_node/general/pub_resolution', 2)  # HD720 resolution
+            norospy.set_param('/zed/zed_node/depth/point_cloud_freq', 5.0)  # 5Hz update rate
+            norospy.set_param('/zed/zed_node/point_cloud/cloud_registered/zstd/zstd_encode_level', 1)  # Fastest compression
         except Exception as e:
             logger.warning(f"Could not set point cloud parameters: {e}")
         
         # Subscribe to RGB image topic
-        rgb_image_topic = roslibpy.Topic(ros, '/zed/zed_node/rgb/image_rect_color', 'sensor_msgs/Image')
-        rgb_image_topic.subscribe(rgb_image_callback)
+        norospy.Subscriber('/zed/zed_node/rgb/image_rect_color', Image, rgb_image_callback)
         
         # Subscribe to depth image topic
-        depth_image_topic = roslibpy.Topic(ros, '/zed/zed_node/depth/depth_registered', 'sensor_msgs/Image')
-        depth_image_topic.subscribe(depth_image_callback)
+        norospy.Subscriber('/zed/zed_node/depth/depth_registered', Image, depth_image_callback)
         
         # Subscribe to IMU topic
-        imu_topic = roslibpy.Topic(ros, '/zed/zed_node/imu/data', 'sensor_msgs/Imu')
-        imu_topic.subscribe(imu_callback)
+        norospy.Subscriber('/zed/zed_node/imu/data', Imu, imu_callback)
         
-        # Create and immediately subscribe to point cloud topic
-        point_cloud_topic = roslibpy.Topic(
-            ros,
+        # Subscribe to point cloud topic
+        norospy.Subscriber(
             '/zed/zed_node/point_cloud/cloud_registered/zstd',
-            'point_cloud_interfaces/msg/CompressedPointCloud2',
+            CompressedPointCloud2,
+            point_cloud_callback,
             queue_size=1  # Only keep latest message
         )
-        point_cloud_topic.subscribe(point_cloud_callback)
         global point_cloud_subscription_active
         point_cloud_subscription_active = True
         
@@ -74,14 +70,31 @@ def imu_callback(message):
     try:
         # Extract IMU data and timestamps
         receive_time = time.time()
-        msg_time = message.get('header', {}).get('stamp', {})
-        msg_time_sec = msg_time.get('sec', 0) + msg_time.get('nanosec', 0) / 1e9
+        msg_time = message.header.stamp
+        msg_time_sec = msg_time.secs + msg_time.nsecs / 1e9
         
         current_imu_data = {
-            'header': message.get('header', {}),
-            'orientation': message.get('orientation', {}),
-            'angular_velocity': message.get('angular_velocity', {}),
-            'linear_acceleration': message.get('linear_acceleration', {}),
+            'header': {
+                'seq': message.header.seq,
+                'stamp': {'sec': message.header.stamp.secs, 'nanosec': message.header.stamp.nsecs},
+                'frame_id': message.header.frame_id
+            },
+            'orientation': {
+                'x': message.orientation.x,
+                'y': message.orientation.y,
+                'z': message.orientation.z,
+                'w': message.orientation.w
+            },
+            'angular_velocity': {
+                'x': message.angular_velocity.x,
+                'y': message.angular_velocity.y,
+                'z': message.angular_velocity.z
+            },
+            'linear_acceleration': {
+                'x': message.linear_acceleration.x,
+                'y': message.linear_acceleration.y,
+                'z': message.linear_acceleration.z
+            },
             'receive_timestamp': receive_time,
             'msg_timestamp': msg_time_sec,
             'latency': receive_time - msg_time_sec if msg_time_sec > 0 else 0
@@ -90,28 +103,32 @@ def imu_callback(message):
         logger.error(f"Error processing IMU data: {str(e)}")
 
 def cleanup_point_cloud():
-    global point_cloud_topic, point_cloud_subscription_active
-    if point_cloud_topic and point_cloud_subscription_active:
+    global point_cloud_subscription_active
+    if point_cloud_subscription_active:
         try:
-            point_cloud_topic.unsubscribe()
-            logger.info("Unsubscribed from point cloud topic")
+            # In norospy, subscribers are automatically cleaned up when the node shuts down
+            logger.info("Point cloud subscription will be cleaned up on shutdown")
         except Exception as e:
-            logger.error(f"Error unsubscribing from point cloud: {str(e)}")
+            logger.error(f"Error cleaning up point cloud subscription: {str(e)}")
     point_cloud_subscription_active = False
 
 @app.on_shutdown
 def shutdown():
     cleanup_point_cloud()
+    try:
+        norospy.signal_shutdown('Application shutting down')
+    except Exception as e:
+        logger.error(f"Error during shutdown: {str(e)}")
 
 def rgb_image_callback(message):
     global current_rgb_image
     try:
         # Get raw image data
-        img_data = np.frombuffer(base64.b64decode(message['data']), dtype=np.uint8)
+        img_data = np.frombuffer(message.data, dtype=np.uint8)
         
         # Reshape the image data
-        height = message.get('height', 0)
-        width = message.get('width', 0)
+        height = message.height
+        width = message.width
         
         if height and width:
             # Reshape assuming RGBA format (4 channels)
@@ -129,10 +146,10 @@ def depth_image_callback(message):
     global current_depth_image
     try:
         # Get raw depth data
-        depth_data = np.frombuffer(base64.b64decode(message['data']), dtype=np.float32)
+        depth_data = np.frombuffer(message.data, dtype=np.float32)
         
-        height = message.get('height', 0)
-        width = message.get('width', 0)
+        height = message.height
+        width = message.width
         
         if height and width:
             # Reshape depth data
@@ -165,8 +182,8 @@ def point_cloud_callback(message):
     global current_point_cloud, last_point_cloud_time, point_cloud_count
     try:
         receive_time = time.time()
-        msg_time = message.get('header', {}).get('stamp', {})
-        msg_time_sec = msg_time.get('sec', 0) + msg_time.get('nanosec', 0) / 1e9
+        msg_time = message.header.stamp
+        msg_time_sec = msg_time.secs + msg_time.nsecs / 1e9
         
         # Calculate time since last message
         time_diff = receive_time - last_point_cloud_time if last_point_cloud_time > 0 else 0
@@ -174,15 +191,19 @@ def point_cloud_callback(message):
         
         # Extract all relevant metadata
         info = {
-            'header': message.get('header', {}),
-            'height': message.get('height', 0),
-            'width': message.get('width', 0),
-            'fields': message.get('fields', []),
-            'is_bigendian': message.get('is_bigendian', False),
-            'point_step': message.get('point_step', 0),
-            'row_step': message.get('row_step', 0),
-            'is_dense': message.get('is_dense', False),
-            'compressed_size': len(message.get('data', '')),
+            'header': {
+                'seq': message.header.seq,
+                'stamp': {'sec': message.header.stamp.secs, 'nanosec': message.header.stamp.nsecs},
+                'frame_id': message.header.frame_id
+            },
+            'height': message.height,
+            'width': message.width,
+            'fields': [{'name': f.name, 'offset': f.offset, 'datatype': f.datatype, 'count': f.count} for f in message.fields],
+            'is_bigendian': message.is_bigendian,
+            'point_step': message.point_step,
+            'row_step': message.row_step,
+            'is_dense': message.is_dense,
+            'compressed_size': len(message.data),
             'time_since_last': f"{time_diff:.3f}s",
             'message_count': point_cloud_count,
             'average_rate': f"{point_cloud_count / (receive_time - last_point_cloud_time):.2f} Hz" if last_point_cloud_time > 0 else "N/A",
@@ -230,7 +251,7 @@ def main_page():
                 depth_image = ui.image().classes('w-[640px] h-[480px] border-2')
         
         def update_images():
-            if ros is None or not ros.is_connected:
+            if ros is None or not ros:
                 status.text = 'Not connected to ROS'
                 status.classes('text-red-500')
                 return
